@@ -98,7 +98,7 @@ def classify_ticket_with_langchain(ticket):
 
     # Initialize Ollama model
     if not os.getenv("HUGGINGFACEHUB_API_TOKEN"):
-        os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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@gmail.com"
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
 
     llm = HuggingFaceEndpoint(
         repo_id="HuggingFaceH4/zephyr-7b-beta",
