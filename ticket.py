@@ -190,7 +190,7 @@ Email = st.text_input("Enter your Email ID", disabled=st.session_state.disabled)
 ebutton = st.button("Enter", disabled=st.session_state.disabled, on_click=handle_email_input)
 
 # Show the file uploader only if the email is validated
-if st.session_state.get("email_validated", False):
+if Email:
     uploaded_file = st.file_uploader("Upload Ticket Details (CSV/Excel/TXT)", type=["csv", "xlsx", "txt"])
     if uploaded_file is not None:
         # Read file into DataFrame
