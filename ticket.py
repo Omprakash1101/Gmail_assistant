@@ -145,7 +145,7 @@ def is_valid_email(email):
     # Define a regex pattern for validating an email 
     pattern = r'^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$' 
     # Use re.match to check whether the email matches the pattern 
-    if re.match(pattern, email) and "@gmail.com" in email: 
+    if re.match(pattern, email): 
         return True 
     else: 
         return False
