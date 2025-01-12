@@ -120,13 +120,13 @@ def classify_ticket_with_langchain(ticket):
         1. Infra: Issues related to servers, networks, data centers, and hardware (e.g., server downtime, network outages, hardware issues).
         2. Application Team: Issues related to application bugs, coding errors, and user experience problems (e.g., login failures, incorrect data display, or feature malfunctions).
         3. Access Management: Requests for granting access to systems, tools, or accounts (e.g., new employee account setup, access requests).
-
+        
         Examples:
         - Infra: "Server Downtime in Data Center 1. Several servers are unreachable."
         - Application Team: "Bug in User Authentication Module causing login errors."
         - Access Management: "Access request for a new employee to systems like email or CRM."
 
-        Carefully read the description below and classify it into one of the above categories.
+        Carefully read the description below and classify it into one of the above categories or else reply general for the input.
 
         Ticket Description: {ticket}
         """
