@@ -63,6 +63,14 @@ def get_original_email(service, user_id='me'):
         print(f"Original Message ID: {messages[0]['id']}")
         print(f"Thread ID: {thread_id}")
         print(f"Subject: {subject}")
+        msg_labels = {
+        'removeLabelIds': ['UNREAD']
+        }
+        
+        # Modify the message by removing the UNREAD label
+        service.users().messages().modify(userId='me', id=message_id, body=msg_labels).execute()
+    
+        print(f"Message with ID: {message_id} marked as read.")
         return {
             'id': messages[0]['id'],
             'threadId': thread_id,
@@ -197,8 +205,6 @@ while True:
                 print(body)
             else:
                 body="Dear User,\nKindly use our website(https://tickets-v1.streamlit.app/) to rise a ticket with file.\nThank you and Regards,\nTicket Assist Team"
-
-            mark_as_read(service,original_email['id'])
             send_email(service, sender, to, sub, body)
             time.sleep(60)
 st.write("hi")
