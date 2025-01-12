@@ -181,10 +181,8 @@ def classify_ticket_with_langchain(ticket):
     if result.lower()=="unknown":
         result="Hi, How can I help you, If any mistake kindly contact the admin"
     return result
-
-def main():
-    service = authenticate_gmail()
-    while True:
+service = authenticate_gmail()
+while True:
         original_email = get_original_email(service)
         if not original_email:
             print("No email found to reply to.")
@@ -200,7 +198,5 @@ def main():
                 body="Dear User,\nKindly use our website(https://tickets-v1.streamlit.app/) to rise a ticket with file.\nThank you and Regards,\nTicket Assist Team"
             send_email(service, sender, to, sub, body)
             mark_as_read(service,original_email['id'])
-    st.write("hi")
+st.write("hi")
 
-if __name__ == '__main__':
-    main()
