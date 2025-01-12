@@ -197,7 +197,8 @@ while True:
                 print(body)
             else:
                 body="Dear User,\nKindly use our website(https://tickets-v1.streamlit.app/) to rise a ticket with file.\nThank you and Regards,\nTicket Assist Team"
-            send_email(service, sender, to, sub, body)
+
             mark_as_read(service,original_email['id'])
+            send_email(service, sender, to, sub, body)
 st.write("hi")
 
