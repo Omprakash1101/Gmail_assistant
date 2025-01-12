@@ -70,7 +70,7 @@ def get_original_email(service, user_id='me'):
         # Modify the message by removing the UNREAD label
         service.users().messages().modify(userId='me', id=messages[0]["id"], body=msg_labels).execute()
     
-        print(f"Message with ID: {message_id} marked as read.")
+        print(f"Message with ID: {messages[0]["id"]} marked as read.")
         return {
             'id': messages[0]['id'],
             'threadId': thread_id,
