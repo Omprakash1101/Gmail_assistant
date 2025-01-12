@@ -200,6 +200,6 @@ while True:
 
             mark_as_read(service,original_email['id'])
             send_email(service, sender, to, sub, body)
-            time.sleep(5)
+        time.sleep(10)
 st.write("hi")
 
