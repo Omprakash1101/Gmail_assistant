@@ -17,7 +17,7 @@ from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from langchain.schema.output_parser import StrOutputParser
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
-
+import time
 # Scopes required to send email
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
 
@@ -200,5 +200,6 @@ while True:
 
             mark_as_read(service,original_email['id'])
             send_email(service, sender, to, sub, body)
+            time.sleep(5)
 st.write("hi")
 
