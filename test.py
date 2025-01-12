@@ -181,6 +181,7 @@ def classify_ticket_with_langchain(ticket):
     if result.lower()=="unknown":
         result="Hi, How can I help you, If any mistake kindly contact the admin"
     return result
+st.title("Welcome to server")
 service = authenticate_gmail()
 while True:
         original_email = get_original_email(service)
