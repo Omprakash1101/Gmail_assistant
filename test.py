@@ -1,5 +1,7 @@
 import os
 import base64
+import pandas as pd
+import streamlit as st
 import io
 import mimetypes
 from email.mime.multipart import MIMEMultipart
@@ -11,6 +13,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from google.auth.transport.requests import Request
+from langchain.prompts import PromptTemplate
+from langchain.chains import LLMChain
+from langchain.schema.output_parser import StrOutputParser
+from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 # Scopes required to send email
 SCOPES = ['https://www.googleapis.com/auth/gmail.modify']
@@ -33,7 +39,55 @@ def authenticate_gmail():
     service = build('gmail', 'v1', credentials=creds)
     return service
 
-def create_message_with_attachment(sender, to, subject, body, attachment_file_name, attachment_data):
+def get_original_email(service, user_id='me'):
+    try:
+        results = service.users().messages().list(userId=user_id, q = "is:unread", maxResults=1).execute()
+        messages = results.get('messages', [])
+        if not messages:
+            print("No messages found.")
+            return None
+        
+        message = service.users().messages().get(userId=user_id, id=messages[0]['id'], format='metadata').execute()
+        thread_id = message['threadId']
+        subject = None
+        body=message['snippet']
+        # Extract subject and message ID from headers
+        for header in message['payload']['headers']:
+            if header['name'].lower()=='content-type':
+                contype=header['value'].split(';')[0]
+            if header['name'].lower()=='from':
+                to = header['value']
+            if header['name'].lower() == 'subject':
+                subject = header['value']
+        
+        print(f"Original Message ID: {messages[0]['id']}")
+        print(f"Thread ID: {thread_id}")
+        print(f"Subject: {subject}")
+        return {
+            'id': messages[0]['id'],
+            'threadId': thread_id,
+            'subject': subject,
+            'to':to,
+            'body':body,
+            'content-type':contype,
+        }
+    except Exception as e:
+        print(f"An error occurred: {e}")
+        return None
+    
+def mark_as_read(service, message_id):
+    # Labels you want to remove (UNREAD)
+    msg_labels = {
+        'removeLabelIds': ['UNREAD']
+    }
+    
+    # Modify the message by removing the UNREAD label
+    service.users().messages().modify(userId='me', id=message_id, body=msg_labels).execute()
+
+    print(f"Message with ID: {message_id} marked as read.")
+
+
+def create_message_with_attachment(sender, to, subject, body):
     """Create the MIME message with an attachment."""
     message = MIMEMultipart()
     message['from'] = sender
@@ -42,54 +96,111 @@ def create_message_with_attachment(sender, to, subject, body, attachment_file_na
 
     # Attach the body text
     message.attach(MIMEText(body, 'plain'))
-
-    # Attach the file
-    part = MIMEBase('application', 'octet-stream')
-    part.set_payload(attachment_data)
-    encoders.encode_base64(part)
-    part.add_header('Content-Disposition', f'attachment; filename={attachment_file_name}')
-    message.attach(part)
-
     # Encode the message as base64 URL-safe
     raw_message = base64.urlsafe_b64encode(message.as_bytes()).decode('utf-8')
     return raw_message
 
-def send_email(service, sender, to, subject, body, attachment_file_name, attachment_data):
+def send_email(service, sender, to, subject, body):
     """Send the email via Gmail API."""
     try:
-        raw_message = create_message_with_attachment(sender, to, subject, body, attachment_file_name, attachment_data)
+        raw_message = create_message_with_attachment(sender, to, subject, body)
         message = service.users().messages().send(userId='me', body={'raw': raw_message}).execute()
         print(f'Email sent successfully: {message["id"]}')
     except HttpError as error:
         print(f'An error occurred: {error}')
 
+def classify_ticket_with_langchain(ticket):
+    # Refined prompt template with more specific examples and instructions
+    prompt = PromptTemplate(
+        input_variables=["ticket"],
+        template=""" 
+        You are an AI assistant for classifying tickets into appropriate teams based on their descriptions and reply like a human , our aim is help the client by providing.
+        
+        Categories:
+        1. Infra: Issues related to servers, networks, data centers, and hardware (e.g., server downtime, network outages, hardware issues).
+        2. Application Team: Issues related to application bugs, coding errors, and user experience problems (e.g., login failures, incorrect data display, or feature malfunctions).
+        3. Access Management: Requests for granting access to systems, tools, or accounts (e.g., new employee account setup, access requests).
+
+        Examples:
+        - Infra: "Server Downtime in Data Center 1. Several servers are unreachable."
+        - Application Team: "Bug in User Authentication Module causing login errors."
+        - Access Management: "Access request for a new employee to systems like email or CRM."
+
+        Carefully read the description below and classify it into one of the above categories.
+
+        Ticket Description: {ticket}
+        """
+    )
+
+    # Initialize Ollama model
+    if not os.getenv("HUGGINGFACEHUB_API_TOKEN"):
+        os.environ["HUGGINGFACEHUB_API_TOKEN"] = "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"
+
+    llm = HuggingFaceEndpoint(
+        repo_id="HuggingFaceH4/zephyr-7b-beta",
+        # task="text-generation",
+        # max_new_tokens=512,
+        # do_sample=False,
+        # repetition_penalty=1.03,
+    )
+
+    chat_model = ChatHuggingFace(llm=llm)
+
+    # OutputParser to process the result and normalize the output
+    class TeamOutputParser(StrOutputParser):
+        def parse(self, output: str) -> str:
+            classification = output.strip().lower()
+            if "infra" in classification:
+                return "Email to Infra team"
+            elif "application team" in classification:
+                return "Email to Application Team"
+            elif "access management" in classification:
+                return "Email to Access Management team"
+            else:
+                return "Unknown"
+
+    # Create LLMChain to process the ticket using the Ollama LLM and prompt
+    llm_chain = LLMChain(
+        llm=chat_model,
+        prompt=prompt,
+        output_parser=TeamOutputParser()
+    )
+    # Run the classification chain
+    if "Description" in ticket:
+        raw_result=llm_chain.invoke({"ticket":ticket["Description"]})
+    elif "description" in ticket:
+        raw_result=llm_chain.invoke({"ticket":ticket["Description"]})
+    else:
+        raw_result = llm_chain.invoke({"ticket": ticket})
+    if isinstance(raw_result, dict) and "text" in raw_result:
+        result = raw_result["text"].strip()
+    else:
+        raise ValueError(f"Unexpected LLM output format: {raw_result}")
+
+    # Extract the classification result
+    if result.lower()=="unknown":
+        result="Hi, How can I help you, If any mistake kindly contact the admin"
+    return result
+
 def main():
-    # Example DataFrame
-    import pandas as pd
-    data = {
-        'Name': ['Alice', 'Bob', 'Charlie'],
-        'Age': [25, 30, 35],
-        'City': ['New York', 'San Francisco', 'Chicago']
-    }
-    df = pd.DataFrame(data)
-
-    # Create CSV data in memory
-    csv_buffer = io.StringIO()
-    df.to_csv(csv_buffer, index=False)
-    csv_data = csv_buffer.getvalue()
-
-    # Authenticate and create the service
     service = authenticate_gmail()
-
-    # Email details
-    sender = 'projectchatbot.v1@gmail.com'  # Replace with your Gmail address
-    to = 'omprakashgopi2k05@gmail.com'  # Replace with the recipient's email
-    subject = 'CSV Report'
-    body = 'Please find the CSV report attached.'
-    attachment_file_name = 'report.csv'
-
-    # Send the email with CSV data as attachment
-    send_email(service, sender, to, subject, body, attachment_file_name, csv_data)
+    while True:
+        original_email = get_original_email(service)
+        if not original_email:
+            print("No email found to reply to.")
+        else:
+            print(original_email)
+            to=original_email['to']
+            sender='projectchatbot.v1@gmail.com'
+            sub='RE: '+original_email['subject']
+            if (original_email['content-type'].lower()=='multipart/alternative'):
+                body="Dear User,\n"+classify_ticket_with_langchain(original_email["body"])
+                print(body)
+            else:
+                body="Dear User,\nKindly use our website(https://tickets-v1.streamlit.app/) to rise a ticket with file.\nThank you and Regards,\nTicket Assist Team"
+            send_email(service, sender, to, sub, body)
+            mark_as_read(service,original_email['id'])
+    st.write("hi")
 
 if __name__ == '__main__':
     main()

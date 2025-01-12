@@ -42,6 +42,8 @@ def authenticate_gmail():
     service = build('gmail', 'v1', credentials=creds)
     return service
 
+
+
 def create_message_with_attachment(sender, to, subject, body, attachment_file_name, attachment_data):
     """Create the MIME message with an attachment."""
     message = MIMEMultipart()
@@ -169,6 +171,8 @@ def process_txt_file(file):
         ticket_data.append(current_ticket)
     return pd.DataFrame(ticket_data)
 
+service = authenticate_gmail()
+    
 # Streamlit UI for file upload and ticket classification
 st.title("Ticket Assignment System")
 
@@ -246,7 +250,7 @@ if Email:
             mime="text/csv"
         )
         # Authenticate and create the service
-        service = authenticate_gmail()
+        
 
         # Email details
         sender = 'projectchatbot.v1@gmail.com'
